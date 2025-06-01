@@ -1,0 +1,16 @@
+# Ambiente Virtual
+.venv/
+
+# Arquivos VS Code
+.vscode/
+
+# Arquivos PDF (Guias)
+*.pdf
+
+# Arquivos Python compilados e caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Outros (adicione conforme necessário)
+*.log
