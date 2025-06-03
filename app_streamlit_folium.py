@@ -148,7 +148,7 @@ if df is not None:
             ).add_to(m)
 
         # Exibe o mapa
-        st_folium(m, width=725, height=500)
+        st_folium(m, width=1000, height=650)
 
         # --- Legenda de Cores --- 
         st.sidebar.subheader(" Legenda de Cores")
