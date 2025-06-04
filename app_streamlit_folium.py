@@ -196,3 +196,4 @@ Website: {website_link}"""
 
 elif df is None:
     st.error("Falha no carregamento ou processamento dos dados. Verifique as mensagens acima.")
+# 04062025
