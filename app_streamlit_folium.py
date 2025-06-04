@@ -5,22 +5,18 @@ from streamlit_folium import st_folium
 import hashlib
 import os
 
-# ✅ Deve ser a PRIMEIRA chamada Streamlit
+# ✅ Primeira chamada obrigatória
 st.set_page_config(page_title="Dashboard de Leads Baixada", layout="wide")
 
-# --- Botão para limpar cache ---
-if st.sidebar.button("🔄 Recarregar dados (limpar cache)"):
-    st.cache_data.clear()
-    st.rerun()
-
-# --- Funções Auxiliares ---
+# --- Funções ---
 
 @st.cache_data
 def read_csv_cached(filename="leads_baixada.csv"):
     try:
         df = pd.read_csv(filename)
         return df
-    except Exception:
+    except Exception as e:
+        st.error(f"Erro ao ler o arquivo CSV: {e}")
         return None
 
 def validate_and_process_data(df):
@@ -30,7 +26,8 @@ def validate_and_process_data(df):
         df.columns = df.columns.str.lower()
         required_cols = ["nome", "endereco", "municipio", "categoria", "lat", "lng"]
         if not all(col in df.columns for col in required_cols):
-            st.error("Erro: O arquivo não contém as colunas necessárias: " + ", ".join(required_cols))
+            st.error("⚠️ Colunas faltando no CSV! Esperado: " + ", ".join(required_cols))
+            st.warning("Colunas encontradas: " + ", ".join(df.columns))
             return None
 
         df_processed = df.copy()
@@ -64,21 +61,26 @@ def generate_color_map_folium(categories):
             color_map[category] = "#" + hashlib.md5(category.encode()).hexdigest()[:6]
     return color_map
 
-# --- Carregamento de dados ---
-
-csv_filename = "leads_baixada.csv"
-if not os.path.isfile(csv_filename):
-    st.error("Arquivo de dados não encontrado.")
-    df = None
-else:
-    df_raw = read_csv_cached(csv_filename)
-    df = validate_and_process_data(df_raw)
-
-# --- Interface ---
+# --- Início do App ---
 
 st.title("🗺️ Dashboard de Leads Baixada Santista")
 
-if df is not None:
+csv_filename = "leads_baixada.csv"
+df_raw = read_csv_cached(csv_filename)
+df = validate_and_process_data(df_raw)
+
+# 🔍 DEBUG TEMPORÁRIO
+with st.expander("🛠️ Diagnóstico (Debug)"):
+    if df_raw is not None:
+        st.write("Primeiras linhas do CSV original:")
+        st.dataframe(df_raw.head())
+    if df is not None:
+        st.write("Colunas válidas pós-processamento:")
+        st.write(df.columns.tolist())
+        st.write("Registros válidos:", len(df))
+
+# --- Interface se dados forem válidos ---
+if df is not None and not df.empty:
     base_cols = ["nome", "endereco", "municipio", "categoria", "avaliacao", "numero_avaliacoes"]
     contact_cols = [c for c in ["telefone", "website"] if c in df.columns and df[c].notna().any()]
     display_cols = base_cols + contact_cols
@@ -116,4 +118,4 @@ if df is not None:
     else:
         st.info("Nenhum lead encontrado para os filtros selecionados.")
 else:
-    st.warning("Nenhum dado disponível para exibir.")
+    st.error("🚫 Nenhum dado válido foi carregado.")
