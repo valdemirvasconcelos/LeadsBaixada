@@ -8,9 +8,8 @@ from io import StringIO
 st.set_page_config(page_title="Dashboard de Leads Baixada", layout="wide")
 st.title("Dashboard de Leads Baixada")
 
-github_url_default = "https://raw.githubusercontent.com/valdemirvasconcelos/leadsbaixada/main/leads_baixada.csv"
-github_url = st.sidebar.text_input("URL do arquivo CSV no GitHub", value=github_url_default)
-st.markdown(f"Carregando dados da URL: [{github_url}]({github_url})")
+# URL fixa - removendo o input da sidebar
+github_url = "https://raw.githubusercontent.com/valdemirvasconcelos/leadsbaixada/main/leads_baixada.csv"
 
 @st.cache_data
 def load_data(url: str) -> pd.DataFrame:
@@ -29,14 +28,22 @@ df = load_data(github_url)
 if df.empty:
     st.stop()
 
-# Mostrar as colunas para debug (remova depois se quiser)
-# st.write("Colunas encontradas no dataset:", df.columns.tolist())
-
 # Normaliza colunas
 df.columns = df.columns.str.strip().str.lower()
 df = df.copy()
 
-# --- Filtros sidebar ---
+# Função específica para converter lat/lng no formato brasileiro
+def clean_lat_lng(serie: pd.Series) -> pd.Series:
+    # Remove aspas e espaços, substitui vírgulas por pontos
+    texto = serie.astype(str).str.strip().str.replace('"', '').str.replace(',', '.')
+    return pd.to_numeric(texto, errors="coerce")
+
+# Converte lat/lng para numérico
+df.loc[:, "lat"] = clean_lat_lng(df["lat"])
+df.loc[:, "lng"] = clean_lat_lng(df["lng"])
+
+# Remove linhas com lat/lng nulos
+df = df.dropna(subset=['lat', 'lng'])
 
 # Lista de municípios (cidades)
 municipios = sorted(df["municipio"].dropna().unique())
@@ -52,32 +59,15 @@ df_filt = df[
     (df["categoria"].isin(cat_selecionadas))
 ].copy()
 
-# Verifica colunas lat/lng ou alternativas
-mostrar_mapa = True
-if "lat" not in df_filt.columns or "lng" not in df_filt.columns:
-    if {"latitude", "longitude"}.issubset(df_filt.columns):
-        df_filt.rename(columns={"latitude": "lat", "longitude": "lng"}, inplace=True)
-    else:
-        mostrar_mapa = False
-        st.warning("O dataset não contém colunas de coordenadas ('lat'/'lng' ou 'latitude'/'longitude'). O mapa não será exibido.")
-
-def clean_numeric_col(serie: pd.Series) -> pd.Series:
-    texto = serie.astype(str).str.replace(",", ".")
-    return pd.to_numeric(texto, errors="coerce")
-
-if mostrar_mapa:
-    df_filt.loc[:, "lat"] = clean_numeric_col(df_filt["lat"])
-    df_filt.loc[:, "lng"] = clean_numeric_col(df_filt["lng"])
-
 # Exibe tabela sem lat/lng
 st.subheader(f"📊 {len(df_filt)} leads filtrados")
-cols_exibir = [col for col in df_filt.columns if col not in ["lat", "lng"]]
+cols_exibir = [col for col in df_filt.columns if col not in ["lat", "lng", "unnamed: 11"]]
 st.dataframe(df_filt[cols_exibir])
 
 # Gera mapa
-if mostrar_mapa:
+if len(df_filt) > 0:
     map_center = [-23.9, -46.4]
-    zoom_start = 9
+    zoom_start = 10
 
     def generate_color_map(categories) -> dict:
         palette = [
@@ -97,17 +87,18 @@ if mostrar_mapa:
             if pd.notnull(lat) and pd.notnull(lng):
                 folium.CircleMarker(
                     location=[float(lat), float(lng)],
-                    radius=5,
+                    radius=8,
                     color=color_map.get(cat, "gray"),
                     fill=True,
                     fill_color=color_map.get(cat, "gray"),
-                    popup=f"{row.get('nome', 'Sem nome')}<br>Categoria: {cat}<br>Município: {row.get('municipio', '')}"
+                    fill_opacity=0.8,
+                    popup=f"<b>{row.get('nome', 'Sem nome')}</b><br>Categoria: {cat}<br>Município: {row.get('municipio', '')}<br>Avaliação: {row.get('avaliacao', 'N/A')}"
                 ).add_to(m)
 
         st_folium(m, width=900, height=650)
 
         # Legenda na sidebar
-        st.sidebar.subheader("Legenda de Cores")
+        st.sidebar.subheader("🎨 Legenda de Cores")
         for cat, cor in color_map.items():
             if cat in cat_selecionadas:
                 st.sidebar.markdown(f"<span style='color:{cor}; font-size: 20px;'>●</span> {cat}", unsafe_allow_html=True)
@@ -115,4 +106,4 @@ if mostrar_mapa:
     except Exception as e:
         st.error(f"Erro ao gerar o mapa: {e}")
 else:
-    st.info("Exibindo somente os dados, pois não há colunas de coordenadas para gerar o mapa.")
+    st.info("Nenhum lead encontrado com os filtros selecionados.")
