@@ -129,7 +129,7 @@ if len(df_filt) > 0:
                     tooltip=nome  # AJUSTE ADICIONADO: tooltip mostra o nome ao passar o mouse
                 ).add_to(m)
 
-        st_folium(m, width=900, height=650)
+        st_folium(m, width=1000, height=650)
 
         # Legenda
         st.sidebar.subheader("🎨 Legenda de Cores")
