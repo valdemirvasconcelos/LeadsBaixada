@@ -5,7 +5,7 @@ from streamlit_folium import st_folium
 import hashlib
 import os
 
-st.set_page_config(page_title="Dashboard de Leads - Folium", layout="wide")
+st.set_page_config(page_title="Dashboard de Leads Baixada", layout="wide")
 
 # --- Funções Auxiliares ---
 
@@ -49,7 +49,7 @@ def validate_and_process_data(df, filename="leads_baixada.csv"):
         return df_processed
         
     except Exception as e:
-        st.error(f"Erro ao processar os dados do arquivo 
+        st.error(f"Erro ao processar os dados do arquivo" )
 
 def generate_color_map_folium(categories):
     """Gera um mapa de cores HEX, com cor fixa para \'Bar/Casa Noturna\'."""
@@ -82,17 +82,15 @@ def generate_color_map_folium(categories):
     return color_map
 
 # --- Interface Streamlit ---
-st.title("🗺️ Dashboard de Leads - Gelo com Sabores (Folium)")
+st.title("🗺️ Dashboard de Leads Baixada Santista ")
 
 # --- Carregamento e Validação dos Dados ---
 
 # 1. Verifica se o arquivo existe ANTES de tentar ler
 csv_filename = "leads_baixada.csv"
 if not os.path.isfile(csv_filename):
-    st.error(f"Erro Crítico: Arquivo de dados 
-ão encontrado.")
-    st.warning(f"Verifique se o arquivo 
-aiz do repositório GitHub e tem exatamente este nome.")
+    st.error(f"Erro Crítico: Arquivo de dados não encontrado.")
+    st.warning(f"Verifique se o arquivo raiz do repositório GitHub e tem exatamente este nome.")
     # Tenta listar arquivos para debug
     try:
         st.warning(f"Arquivos encontrados no diretório atual: {os.listdir(".")}")
