@@ -35,7 +35,9 @@ def validate_and_process_data(df, filename="leads_baixada.csv"):
         df["lat"] = pd.to_numeric(df["lat"].str.replace(',', '.'), errors="coerce")
         df["lng"] = pd.to_numeric(df["lng"].str.replace(',', '.'), errors="coerce")
 
-        # Resto do código...
+        # Remove NaN nas colunas de município e categoria
+        df = df.dropna(subset=["municipio", "categoria"])
+
         df_processed = df.copy()
         df_processed["municipio"] = df_processed["municipio"].astype(str)
         df_processed["categoria"] = df_processed["categoria"].astype(str).str.strip()
@@ -113,11 +115,8 @@ if df is not None:
     cat_sel = st.sidebar.multiselect("Categorias", all_cat_options, default=all_cat_options)
 
     st.sidebar.header("🎨 Opções do Mapa")
-    map_tiles_options = [
-        "OpenStreetMap", "CartoDB positron", "CartoDB dark_matter",
-        "Stamen Terrain", "Stamen Toner", "Stamen Watercolor"
-    ]
-    selected_tile = st.sidebar.selectbox("Estilo do Mapa (Tile)", map_tiles_options, index=0)
+    # Removendo a opção de seleção de estilo do mapa
+    selected_tile = "OpenStreetMap"
     radius_size = st.sidebar.slider("Tamanho dos Pontos (pixels)", min_value=1, max_value=15, value=5, step=1)
 
     if not cat_sel:
@@ -182,6 +181,7 @@ Website: {website_link}"""
                 fill_opacity=0.7
             ).add_to(m)
 
+        # Exibe o mapa com tamanho fixo
         st_folium(m, width=1000, height=650)
 
         st.sidebar.subheader("Legenda de Cores")
