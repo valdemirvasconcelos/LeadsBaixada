@@ -35,8 +35,8 @@ def validate_and_process_data(df, filename="leads_baixada.csv"):
         df["lat"] = pd.to_numeric(df["lat"].str.replace(',', '.'), errors="coerce")
         df["lng"] = pd.to_numeric(df["lng"].str.replace(',', '.'), errors="coerce")
 
-        # Remove NaN nas colunas de município e categoria
-        df = df.dropna(subset=["municipio", "categoria"])
+        # Remove NaN nas colunas de município, categoria, lat e lng
+        df = df.dropna(subset=["municipio", "categoria", "lat", "lng"])
 
         df_processed = df.copy()
         df_processed["municipio"] = df_processed["municipio"].astype(str)
@@ -115,8 +115,7 @@ if df is not None:
     cat_sel = st.sidebar.multiselect("Categorias", all_cat_options, default=all_cat_options)
 
     st.sidebar.header("🎨 Opções do Mapa")
-    # Removendo a opção de seleção de estilo do mapa
-    selected_tile = "OpenStreetMap"
+    selected_tile = "OpenStreetMap"  # Estilo do mapa fixo
     radius_size = st.sidebar.slider("Tamanho dos Pontos (pixels)", min_value=1, max_value=15, value=5, step=1)
 
     if not cat_sel:
@@ -143,7 +142,7 @@ if df is not None:
             else:
                 zoom_start = 10
         except Exception:
-            map_center = [-23.9, -46.4]
+            map_center = [-23.9, -46.4]  # Centro padrão
             zoom_start = 9
 
         m = folium.Map(location=map_center, zoom_start=zoom_start, tiles=selected_tile)
