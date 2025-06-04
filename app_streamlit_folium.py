@@ -28,8 +28,7 @@ def validate_and_process_data(df, filename="leads_baixada.csv"):
     try:
         required_cols = ["nome", "endereco", "municipio", "categoria", "lat", "lng"]
         if not all(col in df.columns for col in required_cols):
-            st.error(f"Erro: O arquivo 
-ão contém as colunas necessárias: {", ".join(required_cols)}")
+            st.error(f"Erro: O arquivo não contém as colunas necessárias: {", ".join(required_cols)}")
             return None
         
         # Copia para evitar SettingWithCopyWarning
