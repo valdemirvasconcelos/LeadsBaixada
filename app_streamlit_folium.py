@@ -5,6 +5,10 @@ from streamlit_folium import st_folium
 import hashlib
 import os
 
+if st.sidebar.button("🔄 Recarregar dados (limpar cache)"):
+    st.cache_data.clear()
+    st.experimental_rerun()
+
 st.set_page_config(page_title="Dashboard de Leads Baixada", layout="wide")
 
 # --- Funções Auxiliares ---
