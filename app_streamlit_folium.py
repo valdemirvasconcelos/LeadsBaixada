@@ -8,14 +8,8 @@ from io import StringIO
 st.set_page_config(page_title="Dashboard de Leads Baixada", layout="wide")
 st.title("Dashboard de Leads Baixada")
 
-# URL padrão corrigida para seu CSV
 github_url_default = "https://raw.githubusercontent.com/valdemirvasconcelos/leadsbaixada/main/leads_baixada.csv"
-
-github_url = st.sidebar.text_input(
-    "URL do arquivo CSV no GitHub",
-    value=github_url_default
-)
-
+github_url = st.sidebar.text_input("URL do arquivo CSV no GitHub", value=github_url_default)
 st.markdown(f"Carregando dados da URL: [{github_url}]({github_url})")
 
 @st.cache_data
@@ -24,7 +18,7 @@ def load_data(url: str) -> pd.DataFrame:
         response = requests.get(url)
         response.raise_for_status()
         csv_data = StringIO(response.text)
-        # Aqui o separador é vírgula e quotechar para aspas
+        # Separador vírgula e quotechar para aspas
         df = pd.read_csv(csv_data, sep=",", encoding="utf-8", quotechar='"')
         return df
     except Exception as e:
@@ -35,26 +29,28 @@ df = load_data(github_url)
 if df.empty:
     st.stop()
 
-# Mostrar as colunas para debug
-st.markdown("**Colunas encontradas no dataset:**")
-st.write(df.columns.tolist())
+# Mostrar as colunas para debug (remova depois se quiser)
+# st.write("Colunas encontradas no dataset:", df.columns.tolist())
 
 # Normaliza colunas
 df.columns = df.columns.str.strip().str.lower()
+df = df.copy()
 
-# Verifica coluna categoria
-if "categoria" not in df.columns:
-    st.error("O dataset não contém a coluna 'categoria'.")
-    st.stop()
+# --- Filtros sidebar ---
 
-# Filtro categorias
-categorias = df["categoria"].dropna().unique().tolist()
-selecionadas = st.sidebar.multiselect(
-    "Selecione categorias para exibir",
-    options=categorias,
-    default=categorias
-)
-df_filt = df[df["categoria"].isin(selecionadas)].copy()
+# Lista de municípios (cidades)
+municipios = sorted(df["municipio"].dropna().unique())
+mun_selecionados = st.sidebar.multiselect("Selecione municípios", options=municipios, default=municipios)
+
+# Lista de categorias
+categorias = sorted(df["categoria"].dropna().unique())
+cat_selecionadas = st.sidebar.multiselect("Selecione categorias", options=categorias, default=categorias)
+
+# Filtra dataframe
+df_filt = df[
+    (df["municipio"].isin(mun_selecionados)) &
+    (df["categoria"].isin(cat_selecionadas))
+].copy()
 
 # Verifica colunas lat/lng ou alternativas
 mostrar_mapa = True
@@ -73,10 +69,12 @@ if mostrar_mapa:
     df_filt.loc[:, "lat"] = clean_numeric_col(df_filt["lat"])
     df_filt.loc[:, "lng"] = clean_numeric_col(df_filt["lng"])
 
-st.subheader("Dados dos Leads")
+# Exibe tabela sem lat/lng
+st.subheader(f"📊 {len(df_filt)} leads filtrados")
 cols_exibir = [col for col in df_filt.columns if col not in ["lat", "lng"]]
 st.dataframe(df_filt[cols_exibir])
 
+# Gera mapa
 if mostrar_mapa:
     map_center = [-23.9, -46.4]
     zoom_start = 9
@@ -93,6 +91,7 @@ if mostrar_mapa:
         m = folium.Map(location=map_center, zoom_start=zoom_start, tiles="OpenStreetMap")
         color_map = generate_color_map(df_filt["categoria"])
 
+        # Adiciona marcadores
         for _, row in df_filt.iterrows():
             lat, lng, cat = row["lat"], row["lng"], row["categoria"]
             if pd.notnull(lat) and pd.notnull(lng):
@@ -102,10 +101,17 @@ if mostrar_mapa:
                     color=color_map.get(cat, "gray"),
                     fill=True,
                     fill_color=color_map.get(cat, "gray"),
-                    popup=f"Categoria: {cat}"
+                    popup=f"{row.get('nome', 'Sem nome')}<br>Categoria: {cat}<br>Município: {row.get('municipio', '')}"
                 ).add_to(m)
 
-        st_folium(m, width=800, height=600)
+        st_folium(m, width=900, height=650)
+
+        # Legenda na sidebar
+        st.sidebar.subheader("Legenda de Cores")
+        for cat, cor in color_map.items():
+            if cat in cat_selecionadas:
+                st.sidebar.markdown(f"<span style='color:{cor}; font-size: 20px;'>●</span> {cat}", unsafe_allow_html=True)
+
     except Exception as e:
         st.error(f"Erro ao gerar o mapa: {e}")
 else:
