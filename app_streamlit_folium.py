@@ -2,22 +2,28 @@ import pandas as pd
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
+import requests
+from io import StringIO
 
 # --- Configurações de página (DEVE ser a primeira chamada Streamlit) ---
 st.set_page_config(page_title="Dashboard de Leads Baixada", layout="wide")
-
-# --- Ação de sidebar: limpar cache ---
-if st.sidebar.button("🔄 Limpar cache de dados"):
-    st.cache_data.clear()
-    st.sidebar.success("Cache limpo! Atualize a página (F5) para recarregar os dados.")
 
 st.title("Dashboard de Leads Baixada")
 
 # --- Função de carregamento de dados com cache ---
 @st.cache_data
-def load_data(filepath: str) -> pd.DataFrame:
+def load_data(github_url: str) -> pd.DataFrame:
     try:
-        df = pd.read_csv(filepath, sep=";", encoding="utf-8")
+        response = requests.get(github_url)
+        response.raise_for_status()  # Verifica se a requisição foi bem-sucedida
+        csv_data = StringIO(response.text)
+        df = pd.read_csv(csv_data, sep=";", encoding="utf-8")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erro ao baixar o arquivo do GitHub: {e}")
+        return pd.DataFrame()
+    except pd.errors.ParserError as e:
+        st.error(f"Erro ao processar o arquivo CSV: {e}")
+        return pd.DataFrame()
     except Exception as e:
         st.error(f"Erro ao carregar o arquivo de dados: {e}")
         return pd.DataFrame()
@@ -37,13 +43,13 @@ def generate_color_map(categories) -> dict:
     unique = sorted(set(categories))
     return {cat: palette[i % len(palette)] for i, cat in enumerate(unique)}
 
-# --- Input do caminho do arquivo ---
-filepath = st.sidebar.text_input(
-    "Caminho do arquivo CSV", 
-    value="dados/leads_baixada.csv"
+# --- Input do caminho do arquivo (agora GitHub URL) ---
+github_url = st.sidebar.text_input(
+    "URL do arquivo CSV no GitHub",
+    value="https://raw.githubusercontent.com/valdemirvasconcelos/leadsbaixada/main/leads_baixada.csv"
 )
 
-df = load_data(filepath)
+df = load_data(github_url)
 if df.empty:
     st.stop()
 
@@ -65,8 +71,8 @@ if "categoria" not in df.columns:
 
 categorias = df["categoria"].dropna().unique().tolist()
 selecionadas = st.sidebar.multiselect(
-    "Selecione categorias para exibir", 
-    options=categorias, 
+    "Selecione categorias para exibir",
+    options=categorias,
     default=categorias
 )
 df_filt = df[df["categoria"].isin(selecionadas)].copy()
