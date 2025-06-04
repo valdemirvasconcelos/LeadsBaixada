@@ -115,6 +115,8 @@ if len(df_filt) > 0:
         # Adiciona marcadores
         for _, row in df_filt.iterrows():
             lat, lng, cat = row["lat_numeric"], row["lng_numeric"], row["categoria"]
+            nome = row.get('nome', 'Sem nome')
+            
             if pd.notnull(lat) and pd.notnull(lng):
                 folium.CircleMarker(
                     location=[lat, lng],
@@ -123,7 +125,8 @@ if len(df_filt) > 0:
                     fill=True,
                     fill_color=color_map.get(cat, "gray"),
                     fill_opacity=0.8,
-                    popup=f"<b>{row.get('nome', 'Sem nome')}</b><br>Categoria: {cat}<br>Município: {row.get('municipio', '')}<br>Avaliação: {row.get('avaliacao', 'N/A')}"
+                    popup=f"<b>{nome}</b><br>Categoria: {cat}<br>Município: {row.get('municipio', '')}<br>Avaliação: {row.get('avaliacao', 'N/A')}",
+                    tooltip=nome  # AJUSTE ADICIONADO: tooltip mostra o nome ao passar o mouse
                 ).add_to(m)
 
         st_folium(m, width=900, height=650)
