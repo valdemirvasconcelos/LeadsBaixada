@@ -29,46 +29,73 @@ if df.empty:
 df.columns = df.columns.str.strip().str.lower()
 df = df.copy()
 
-def clean_lat_lng(serie: pd.Series) -> pd.Series:
-    texto = serie.astype(str).str.strip().str.replace('"', '')
-    # Substitui apenas a última vírgula por ponto decimal
+def clean_coordinates(serie):
+    """Limpa coordenadas no formato específico do CSV"""
     def fix_coord(val):
-        if pd.isna(val) or val == 'nan':
+        if pd.isna(val):
             return None
-        # Remove vírgulas extras (milhares) e substitui a última vírgula por ponto decimal
-        parts = val.split(',')
-        if len(parts) == 1:
-            return val
-        decimal_part = parts[-1]
-        integer_part = ''.join(parts[:-1])
-        return integer_part + '.' + decimal_part
-    texto = texto.apply(fix_coord)
-    return pd.to_numeric(texto, errors='coerce')
+        
+        val_str = str(val).strip().replace('"', '')
+        
+        # Remove todas as vírgulas primeiro
+        clean_val = val_str.replace(',', '')
+        
+        # Tenta diferentes formatos baseados no comprimento
+        try:
+            num = float(clean_val)
+            
+            # Para latitude (deve estar entre -90 e 90)
+            if -900000000 < num < -100000000:  # formato -239609694
+                return num / 10000000  # -23.9609694
+            elif -100000000 < num < -10000000:  # formato -23964431
+                return num / 1000000   # -23.964431
+            elif -10000000 < num < -1000000:   # formato -2396431
+                return num / 100000    # -23.96431
+            
+            # Para longitude (deve estar entre -180 e 180)
+            elif -5000000000000000000 < num < -1000000000000000:  # formato muito grande
+                return num / 10000000000000000  # dividir por um fator grande
+            elif -1000000000 < num < -100000000:  # formato -463692566
+                return num / 10000000  # -46.3692566
+            elif -100000000 < num < -10000000:   # formato -46369256
+                return num / 1000000   # -46.369256
+            
+            # Se está na faixa normal de coordenadas, retorna como está
+            elif -180 <= num <= 180:
+                return num
+                
+        except:
+            pass
+            
+        return None
+    
+    return serie.apply(fix_coord)
 
-# Converte lat/lng no dataframe original antes de filtrar
-df.loc[:, "lat"] = clean_lat_lng(df["lat"])
-df.loc[:, "lng"] = clean_lat_lng(df["lng"])
+# Converte coordenadas
+df['lat_numeric'] = clean_coordinates(df['lat'])
+df['lng_numeric'] = clean_coordinates(df['lng'])
 
 # Remove registros sem coordenadas válidas
-df = df.dropna(subset=['lat', 'lng'])
+df_with_coords = df.dropna(subset=['lat_numeric', 'lng_numeric']).copy()
 
-# Agora cria os filtros depois da conversão
-municipios = sorted(df["municipio"].dropna().unique())
+# Filtros
+municipios = sorted(df_with_coords["municipio"].dropna().unique())
 mun_selecionados = st.sidebar.multiselect("Selecione municípios", options=municipios, default=municipios)
 
-categorias = sorted(df["categoria"].dropna().unique())
+categorias = sorted(df_with_coords["categoria"].dropna().unique())
 cat_selecionadas = st.sidebar.multiselect("Selecione categorias", options=categorias, default=categorias)
 
 # Aplica filtros
-df_filt = df[
-    (df["municipio"].isin(mun_selecionados)) &
-    (df["categoria"].isin(cat_selecionadas))
+df_filt = df_with_coords[
+    (df_with_coords["municipio"].isin(mun_selecionados)) &
+    (df_with_coords["categoria"].isin(cat_selecionadas))
 ].copy()
 
 st.subheader(f"📊 {len(df_filt)} leads filtrados")
-cols_exibir = [col for col in df_filt.columns if col not in ["lat", "lng", "unnamed: 11"]]
+cols_exibir = [col for col in df_filt.columns if col not in ["lat", "lng", "lat_numeric", "lng_numeric", "unnamed: 11"]]
 st.dataframe(df_filt[cols_exibir])
 
+# Gera mapa
 if len(df_filt) > 0:
     map_center = [-23.9, -46.4]
     zoom_start = 10
@@ -85,32 +112,30 @@ if len(df_filt) > 0:
         m = folium.Map(location=map_center, zoom_start=zoom_start, tiles="OpenStreetMap")
         color_map = generate_color_map(df_filt["categoria"])
 
+        # Adiciona marcadores
         for _, row in df_filt.iterrows():
-            lat, lng, cat = row["lat"], row["lng"], row["categoria"]
-            folium.CircleMarker(
-                location=[lat, lng],
-                radius=8,
-                color=color_map.get(cat, "gray"),
-                fill=True,
-                fill_color=color_map.get(cat, "gray"),
-                fill_opacity=0.8,
-                popup=(
-                    f"<b>{row.get('nome', 'Sem nome')}</b><br>"
-                    f"Categoria: {cat}<br>"
-                    f"Município: {row.get('municipio', '')}<br>"
-                    f"Avaliação: {row.get('avaliacao', 'N/A')}"
-                )
-            ).add_to(m)
+            lat, lng, cat = row["lat_numeric"], row["lng_numeric"], row["categoria"]
+            if pd.notnull(lat) and pd.notnull(lng):
+                folium.CircleMarker(
+                    location=[lat, lng],
+                    radius=8,
+                    color=color_map.get(cat, "gray"),
+                    fill=True,
+                    fill_color=color_map.get(cat, "gray"),
+                    fill_opacity=0.8,
+                    popup=f"<b>{row.get('nome', 'Sem nome')}</b><br>Categoria: {cat}<br>Município: {row.get('municipio', '')}<br>Avaliação: {row.get('avaliacao', 'N/A')}"
+                ).add_to(m)
 
         st_folium(m, width=900, height=650)
 
+        # Legenda
         st.sidebar.subheader("🎨 Legenda de Cores")
         for cat in sorted(df_filt["categoria"].unique()):
-            if cat in cat_selecionadas:
-                cor = color_map.get(cat, "gray")
-                st.sidebar.markdown(f"<span style='color:{cor}; font-size: 20px;'>●</span> {cat}", unsafe_allow_html=True)
+            cor = color_map.get(cat, "gray")
+            st.sidebar.markdown(f"<span style='color:{cor}; font-size: 20px;'>●</span> {cat}", unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Erro ao gerar o mapa: {e}")
+        
 else:
-    st.info("Nenhum lead com coordenadas válidas encontrado para exibir no mapa.")
+    st.info("Nenhum lead encontrado com os filtros selecionados.")
