@@ -107,7 +107,7 @@ else:
 # --- Continua apenas se os dados foram carregados e validados com sucesso ---
 if df is not None:
     # Colunas a serem exibidas na tabela
-    base_cols = ["nome", "endereco", "municipio", "categoria", "avaliacao", "numero_avaliacoes"]
+    base_cols = ["Nome", "Endereco", "Municipio", "Categoria", "Avaliacao", "Quantidade"]
     contact_cols = [c for c in ["telefone", "website"] if c in df.columns and df[c].notna().any()]
     display_cols = base_cols + contact_cols
 
