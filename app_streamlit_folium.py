@@ -9,12 +9,12 @@ st.set_page_config(page_title="Dashboard de Leads - Folium", layout="wide")
 
 # --- Funções Auxiliares ---
 
-# CORRIGIDO: Função cacheada SUPER SIMPLES para evitar TokenError
+# Função cacheada para leitura do CSV
 @st.cache_data
 def read_csv_cached(filename="leads_baixada.csv"):
     """Tenta ler o CSV. Retorna o DataFrame ou None em caso de erro."""
     try:
-        # A única coisa dentro da função cacheada é a leitura
+        # Apenas a leitura está dentro da função cacheada
         df = pd.read_csv(filename)
         return df
     except Exception:
@@ -24,45 +24,47 @@ def read_csv_cached(filename="leads_baixada.csv"):
 def validate_and_process_data(df, filename="leads_baixada.csv"):
     """Valida o DataFrame carregado e processa os tipos de dados."""
     if df is None:
-        return None # Se a leitura falhou, não há o que validar
+        return None  # Se a leitura falhou, não há o que validar
     try:
         required_cols = ["nome", "endereco", "municipio", "categoria", "lat", "lng"]
         if not all(col in df.columns for col in required_cols):
-            st.error(f"Erro: O arquivo 
-ão contém as colunas necessárias: {", ".join(required_cols)}")
+            st.error(f"Erro: o arquivo não contém as colunas necessárias: {', '.join(required_cols)}")
             return None
-        
+
         # Copia para evitar SettingWithCopyWarning
         df_processed = df.copy()
-        
+
         # Garante tipos corretos
         df_processed["lat"] = pd.to_numeric(df_processed["lat"], errors="coerce")
         df_processed["lng"] = pd.to_numeric(df_processed["lng"], errors="coerce")
         df_processed = df_processed.dropna(subset=["lat", "lng"])
         df_processed["municipio"] = df_processed["municipio"].astype(str)
         df_processed["categoria"] = df_processed["categoria"].astype(str).str.strip()
-        
+
         # Trata colunas opcionais
         for col in ["avaliacao", "numero_avaliacoes", "telefone", "website"]:
-             if col not in df_processed.columns:
-                 df_processed[col] = None
-                 
+            if col not in df_processed.columns:
+                df_processed[col] = None
+
         return df_processed
-        
+
     except Exception as e:
-        st.error(f"Erro ao processar os dados do arquivo 
+        st.error(f"Erro ao processar os dados do arquivo '{filename}': {e}")
+        return None
 
 def generate_color_map_folium(categories):
-    """Gera um mapa de cores HEX, com cor fixa para \'Bar/Casa Noturna\'."""
+    """Gera um mapa de cores HEX, com cor fixa para 'Bar/Casa Noturna'."""
     color_map = {}
     fixed_colors = {
-        "Bar/Casa Noturna": "#00FFFF", # Azul Cian
-        "Adega": "#DAA520",        # Goldenrod
-        "bar": "#FF6347",          # Tomato
-        "casa noturna": "#8A2BE2"   # BlueViolet
+        "Bar/Casa Noturna": "#00FFFF",  # Azul Cian
+        "Adega": "#DAA520",             # Goldenrod
+        "bar": "#FF6347",               # Tomato
+        "casa noturna": "#8A2BE2"        # BlueViolet
     }
-    other_colors_palette = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", 
-                            "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+    other_colors_palette = [
+        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+        "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
+    ]
     color_index = 0
 
     for category in sorted(list(categories)):
@@ -74,12 +76,12 @@ def generate_color_map_folium(categories):
                 hex_dig = hash_object.hexdigest()
                 color_map[category] = f"#{hex_dig[:6]}"
             except Exception:
-                 color_map[category] = other_colors_palette[color_index % len(other_colors_palette)]
-                 color_index += 1
-                 
+                color_map[category] = other_colors_palette[color_index % len(other_colors_palette)]
+                color_index += 1
+
     if "Bar/Casa Noturna" not in color_map:
-         color_map["Bar/Casa Noturna"] = "#00FFFF"
-         
+        color_map["Bar/Casa Noturna"] = "#00FFFF"
+
     return color_map
 
 # --- Interface Streamlit ---
@@ -90,20 +92,18 @@ st.title("🗺️ Dashboard de Leads - Gelo com Sabores (Folium)")
 # 1. Verifica se o arquivo existe ANTES de tentar ler
 csv_filename = "leads_baixada.csv"
 if not os.path.isfile(csv_filename):
-    st.error(f"Erro Crítico: Arquivo de dados 
-ão encontrado.")
-    st.warning(f"Verifique se o arquivo 
-aiz do repositório GitHub e tem exatamente este nome.")
+    st.error("Erro Crítico: arquivo de dados não encontrado.")
+    st.warning("Verifique se o arquivo 'leads_baixada.csv' está no repositório e com este nome.")
     # Tenta listar arquivos para debug
     try:
-        st.warning(f"Arquivos encontrados no diretório atual: {os.listdir(".")}")
+        st.warning(f"Arquivos encontrados no diretório atual: {os.listdir('.')}")
     except Exception as list_e:
         st.warning(f"Não foi possível listar arquivos do diretório: {list_e}")
-    df = None # Define df como None se o arquivo não existe
+    df = None  # Define df como None se o arquivo não existe
 else:
     # 2. Tenta ler o arquivo usando a função cacheada simples
     df_raw = read_csv_cached(csv_filename)
-    
+
     # 3. Valida e processa os dados FORA da função cacheada
     df = validate_and_process_data(df_raw, csv_filename)
 
@@ -137,7 +137,7 @@ if df is not None:
     else:
         df_filt = df[df["municipio"].isin(mun_sel) & df["categoria"].isin(cat_sel)].copy()
 
-    # --- Exibição da Tabela --- 
+    # --- Exibição da Tabela ---
     st.subheader(f"📊 {len(df_filt)} leads selecionados")
     cols_to_show_in_table = [col for col in display_cols if col in df_filt.columns]
     df_display = df_filt[cols_to_show_in_table].fillna("N/A")
@@ -177,16 +177,14 @@ if df is not None:
             num_avaliacoes = int(row["numero_avaliacoes"]) if pd.notna(row["numero_avaliacoes"]) else 0
             telefone = row["telefone"] if pd.notna(row["telefone"]) else "Não informado"
             website = row["website"] if pd.notna(row["website"]) else "Não informado"
-            website_link = f"<a href=\\\'{website}\\' target=\\\'_blank\\\'>{website}</a>" if website != "Não informado" else "Não informado"
+            website_link = f"<a href='{website}' target='_blank'>{website}</a>" if website != "Não informado" else "Não informado"
 
-            popup_html = f"""
-            <b>{nome}</b><br>
-            {endereco}<br>
-            <i>{categoria}</i><br>
-            Avaliação: {avaliacao} ({num_avaliacoes} avaliações)<br>
-            Telefone: {telefone}<br>
-            Website: {website_link}
-            """
+            popup_html = f"""<b>{nome}</b><br>
+{endereco}<br>
+<i>{categoria}</i><br>
+Avaliação: {avaliacao} ({num_avaliacoes} avaliações)<br>
+Telefone: {telefone}<br>
+Website: {website_link}"""
             iframe = folium.IFrame(popup_html, width=250, height=150)
             popup = folium.Popup(iframe, max_width=250)
 
@@ -203,23 +201,21 @@ if df is not None:
                 fill_opacity=0.7
             ).add_to(m)
 
-        # Exibe o mapa - Mantendo o tamanho aumentado
+        # Exibe o mapa com tamanho personalizado
         st_folium(m, width=1000, height=650)
 
-        # --- Legenda de Cores --- 
-        st.sidebar.subheader(" Legenda de Cores")
+        # --- Legenda de Cores ---
+        st.sidebar.subheader("Legenda de Cores")
         for category in sorted(df_filt["categoria"].unique()):
-             color_hex = color_map.get(category, "#808080")
-             st.sidebar.markdown(
-                 f"<span style=\'color:{color_hex}; font-size: 20px;\'>●</span> {category}",
-                 unsafe_allow_html=True
-             )
+            color_hex = color_map.get(category, "#808080")
+            st.sidebar.markdown(
+                f"<span style='color:{color_hex}; font-size: 20px;'>●</span> {category}",
+                unsafe_allow_html=True
+            )
 
-    elif df is not None: # Só mostra esta mensagem se o DF foi carregado mas ficou vazio após filtros
+    elif df is not None:  # Caso o DataFrame tenha sido carregado, mas os filtros não retornem ninguém
         st.info("ℹ️ Nenhum lead encontrado para os filtros selecionados.")
 
-# Mensagem final se df permaneceu None após todas as verificações
+# Se o DataFrame não foi carregado ou validado
 elif df is None:
-     st.error("Falha no carregamento ou processamento dos dados. Verifique as mensagens acima.")
-
-
+    st.error("Falha no carregamento ou processamento dos dados. Verifique as mensagens acima.")
