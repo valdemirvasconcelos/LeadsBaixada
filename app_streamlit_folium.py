@@ -20,26 +20,17 @@ def read_csv_cached(filename="leads_baixada.csv"):
         return None
 
 def clean_lat_lng_value(val):
-    """
-    Limpa e converte valores de latitude/longitude que podem conter múltiplas vírgulas.
-    Mantém apenas o último '.' ou ',' como separador decimal, remove demais.
-    """
+    """Limpa e converte valores de latitude/longitude."""
     if pd.isna(val):
         return None
     val_str = str(val).strip()
     # Remove espaços e letras ausentes
     # Remove múltiplas vírgulas, mantendo apenas o último como decimal
-    # Substitui vírgula decimal por ponto decimal para float conversion
-    # Strategy: remove all commas, then insert decimal point before last digits as appropriate.
-
-    # Remove all commas, then insert a dot before last 6 digits if plausible (Brazilian coords decimals usually ~6 digits)
     val_no_commas = val_str.replace(",", "")
-    # Extract digits only and sign
     match = re.match(r"^(-?\d+)(\d{6})$", val_no_commas)
     if match:
         cleaned_val = f"{match.group(1)}.{match.group(2)}"
     else:
-        # fallback: replace last comma with dot if any, else just replace commas with dots
         if "," in val_str:
             parts = val_str.rsplit(",", 1)
             cleaned_val = parts[0].replace(",", "") + "." + parts[1]
@@ -70,7 +61,7 @@ def validate_and_process_data(df, filename="leads_baixada.csv"):
         # Remove NaN nas colunas de município, categoria, lat e lng
         df = df.dropna(subset=["municipio", "categoria", "lat", "lng"])
 
-        # Remove valores fora do alcance plausible de lat/lng (Brazil latitude roughly -35 to 5, longitude roughly -75 to -30)
+        # Remove valores fora do alcance plausible de lat/lng
         df = df[(df["lat"] >= -40) & (df["lat"] <= 10)]
         df = df[(df["lng"] >= -80) & (df["lng"] <= -20)]
 
@@ -89,35 +80,12 @@ def validate_and_process_data(df, filename="leads_baixada.csv"):
         return None
 
 def generate_color_map_folium(categories):
-    """Gera um mapa de cores HEX, com cor fixa para 'Bar/Casa Noturna'."""
-    color_map = {}
-    fixed_colors = {
+    """Gera um mapa de cores HEX, com cor fixa para cada categoria."""
+    color_map = {
         "Bar/Casa Noturna": "#00FFFF",  # Azul Cian
-        "Adega": "#DAA520",             # Goldenrod
-        "bar": "#FF6347",               # Tomato
-        "casa noturna": "#8A2BE2"        # BlueViolet
+        "Adega": "#DAA520",              # Goldenrod
+        "Bar": "#FF6347",                # Tomato
     }
-    other_colors_palette = [
-        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
-        "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
-    ]
-    color_index = 0
-
-    for category in sorted(list(categories)):
-        if category in fixed_colors:
-            color_map[category] = fixed_colors[category]
-        else:
-            try:
-                hash_object = hashlib.md5(category.encode())
-                hex_dig = hash_object.hexdigest()
-                color_map[category] = f"#{hex_dig[:6]}"
-            except Exception:
-                color_map[category] = other_colors_palette[color_index % len(other_colors_palette)]
-                color_index += 1
-
-    if "Bar/Casa Noturna" not in color_map:
-        color_map["Bar/Casa Noturna"] = "#00FFFF"
-
     return color_map
 
 # --- Interface Streamlit ---
@@ -225,4 +193,3 @@ if df is not None:
 
 else:
     st.error("Falha no carregamento ou processamento dos dados.")
-
