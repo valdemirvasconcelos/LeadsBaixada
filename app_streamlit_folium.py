@@ -8,21 +8,33 @@ from io import StringIO
 st.set_page_config(page_title="Dashboard de Leads Baixada", layout="wide")
 st.title("Dashboard de Leads Baixada")
 
-github_url = "https://raw.githubusercontent.com/valdemirvasconcelos/leadsbaixada/main/leads_baixada.csv"
+# Opção para escolher entre o arquivo completo (GitHub) ou a versão demo (local)
+data_source = st.sidebar.radio(
+    "Fonte de dados:",
+    ["Demo (Local)", "Completo (GitHub)"],
+    index=0  # Default para a versão demo
+)
 
 @st.cache_data
-def load_data(url: str) -> pd.DataFrame:
+def load_data(source: str) -> pd.DataFrame:
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-        csv_data = StringIO(response.text)
-        df = pd.read_csv(csv_data, sep=",", encoding="utf-8", quotechar='"')
+        if source == "Demo (Local)":
+            # Carrega o arquivo demo local
+            file_path = "leads_baixada_demo.csv"
+            df = pd.read_csv(file_path, sep=",", encoding="utf-8", quotechar='"')
+        else:
+            # Carrega do GitHub (versão completa)
+            github_url = "https://raw.githubusercontent.com/valdemirvasconcelos/leadsbaixada/main/leads_baixada.csv"
+            response = requests.get(github_url)
+            response.raise_for_status()
+            csv_data = StringIO(response.text)
+            df = pd.read_csv(csv_data, sep=",", encoding="utf-8", quotechar='"')
         return df
     except Exception as e:
         st.error(f"Erro ao carregar dados: {e}")
         return pd.DataFrame()
 
-df = load_data(github_url)
+df = load_data(data_source)
 if df.empty:
     st.stop()
 
@@ -37,7 +49,19 @@ def clean_coordinates(serie):
         
         val_str = str(val).strip().replace('"', '')
         
-        # Remove todas as vírgulas primeiro
+        # Verifica se o valor já está no formato com pontos (como -24.006.056)
+        if '.' in val_str:
+            # Substitui todos os pontos exceto o primeiro (que é o separador decimal)
+            parts = val_str.split('.', 1)
+            if len(parts) > 1:
+                clean_val = parts[0] + '.' + parts[1].replace('.', '')
+                try:
+                    return float(clean_val)
+                except ValueError:
+                    # Se falhar, tenta outro método
+                    pass
+        
+        # Remove todas as vírgulas primeiro (formato original)
         clean_val = val_str.replace(',', '')
         
         # Tenta diferentes formatos baseados no comprimento
@@ -117,7 +141,7 @@ if len(df_filt) > 0:
             lat, lng, cat = row["lat_numeric"], row["lng_numeric"], row["categoria"]
             nome = row.get('nome', 'Sem nome')
             
-            if pd.notnull(lat) and pd.notnull(lng):
+            if not (pd.isna(lat) or pd.isna(lng)):
                 folium.CircleMarker(
                     location=[lat, lng],
                     radius=8,
