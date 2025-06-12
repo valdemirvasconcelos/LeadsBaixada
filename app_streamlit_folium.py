@@ -31,6 +31,18 @@ def clean_coordinates(serie):
         if pd.isna(val):
             return None
         val_str = str(val).strip().replace('"', '')
+        
+        # Verifica se o valor está no formato com vírgulas como separadores de milhares (como -23,964,431)
+        if ',' in val_str:
+            # Substitui vírgulas por pontos e mantém apenas o primeiro ponto como separador decimal
+            parts = val_str.split(',', 1)
+            if len(parts) > 1:
+                clean_val = parts[0] + '.' + parts[1].replace(',', '')
+                try:
+                    return float(clean_val)
+                except ValueError:
+                    pass
+        
         # Verifica se o valor já está no formato com pontos (como -24.006.056)
         if '.' in val_str:
             parts = val_str.split('.', 1)
@@ -40,6 +52,8 @@ def clean_coordinates(serie):
                     return float(clean_val)
                 except ValueError:
                     pass
+                    
+        # Tenta converter diretamente se for um número simples
         clean_val = val_str.replace(',', '')
         try:
             num = float(clean_val)
